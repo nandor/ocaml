@@ -20,6 +20,9 @@ type file = string
 external time_include_children: bool -> float = "caml_sys_time_include_children"
 let cpu_time () = time_include_children true
 
+let alloc_reference = ref 0.0
+let time_reference = ref 0.0
+
 module Measure = struct
   type t = {
     time : float;
@@ -29,8 +32,8 @@ module Measure = struct
   let create () =
     let stat = Gc.quick_stat () in
     {
-      time = cpu_time ();
-      allocated_words = stat.minor_words +. stat.major_words;
+      time = cpu_time () -. !time_reference;
+      allocated_words = stat.minor_words +. stat.major_words -. !alloc_reference;
       top_heap_words = stat.top_heap_words;
     }
   let zero = { time = 0.; allocated_words = 0.; top_heap_words = 0 }
@@ -69,7 +72,12 @@ type hierarchy =
 let create () = E (Hashtbl.create 2)
 let hierarchy = ref (create ())
 let initial_measure = ref None
-let reset () = hierarchy := create (); initial_measure := None
+let reset () =
+    let stat = Gc.quick_stat () in
+    alloc_reference := stat.minor_words +. stat.major_words;
+    time_reference := cpu_time ();
+    hierarchy := create ();
+    initial_measure := None
 
 let record_call ?(accumulate = false) name f =
   let E prev_hierarchy = !hierarchy in

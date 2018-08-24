@@ -230,10 +230,13 @@ val add_arguments : string -> (string * Arg.spec * string) list -> unit
   the arguments provided in [Clflags.arg_spec]. It allows plugins to
   provide their own arguments.
 *)
-val parse_arguments : Arg.anon_fun -> string -> unit
+val parse_arguments : string array -> Arg.anon_fun -> string -> unit
 
 (* [print_arguments usage] print the standard usage message *)
 val print_arguments : string -> unit
 
 (* [reset_arguments ()] clear all declared arguments *)
 val reset_arguments : unit -> unit
+
+(* [reset_flags ()] clear all flags *)
+val reset_flags : unit -> unit

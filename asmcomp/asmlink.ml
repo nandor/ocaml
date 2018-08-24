@@ -433,4 +433,5 @@ let reset () =
   interfaces := [];
   implementations := [];
   lib_ccobjs := [];
-  lib_ccopts := []
+  lib_ccopts := [];
+  Hashtbl.reset missing_globals

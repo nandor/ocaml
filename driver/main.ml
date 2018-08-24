@@ -134,7 +134,7 @@ let main () =
      "<options> Compute dependencies (use 'ocamlc -depend -help' for details)"];
   try
     readenv ppf Before_args;
-    Clflags.parse_arguments anonymous usage;
+    Clflags.parse_arguments Sys.argv anonymous usage;
     Compmisc.read_color_env ();
     begin try
       Compenv.process_deferred_actions

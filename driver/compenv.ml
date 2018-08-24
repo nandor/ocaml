@@ -607,7 +607,6 @@ let process_action
       else
         raise(Arg.Bad("don't know what to do with " ^ name))
 
-
 let action_of_file name =
   if Filename.check_suffix name ".ml"
   || Filename.check_suffix name ".mlt" then
@@ -654,4 +653,17 @@ let process_deferred_actions env =
       | _ -> false) !deferred_actions then
     fatal "Option -a cannot be used with .cmxa input files.";
   List.iter (process_action env) (List.rev !deferred_actions);
-  output_name := final_output_name;
+  output_name := final_output_name
+
+let reset () =
+  first_include_dirs := [];
+  last_include_dirs := [];
+  first_ccopts := [];
+  last_ccopts := [];
+  first_ppx := [];
+  last_ppx := [];
+  first_objfiles := [];
+  last_objfiles := [];
+  load_plugin := (fun _ -> ());
+  can_discard := [];
+  deferred_actions := []

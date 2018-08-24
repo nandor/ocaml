@@ -77,3 +77,5 @@ val process_deferred_actions :
   string * (* ocaml module extension *)
   string -> (* ocaml library extension *)
   unit
+
+val reset : unit -> unit

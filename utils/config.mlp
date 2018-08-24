@@ -233,6 +233,16 @@ let print_config oc =
   flush oc;
 ;;
 
+let config_string =
+  let to_string = function
+    | String s -> s
+    | Int n -> string_of_int n
+    | Bool true -> "true"
+    | Bool false -> "false"
+  in
+  let print (x, v) = Printf.sprintf "%s: %s" x (to_string v) in
+  String.concat "\n" (List.map print configuration_variables)
+
 let config_var x =
   match List.assoc_opt x configuration_variables with
   | None -> None
