@@ -71,8 +71,8 @@ let clambda i typed =
          i.outputprefix ~ppf_dump:i.ppf_dump;
        Compilenv.save_unit_info (cmx i))
 
-let implementation ~backend =
-  Compile_common.implementation ~tool_name
+let implementation ~frontend ~backend =
+  Compile_common.implementation ~tool_name ~frontend
     ~native:true ~backend:(fun info typed ->
       Compilenv.reset ?packname:!Clflags.for_package info.modulename;
       if Config.flambda

@@ -41,11 +41,6 @@ let init ppf_dump ~init_path ~tool_name ~sourcefile ~outputprefix =
 
 (** Compile a .mli file *)
 
-let parse_intf i =
-  Pparse.parse_interface ~tool_name:i.tool_name i.sourcefile
-  |> print_if i.ppf_dump Clflags.dump_parsetree Printast.interface
-  |> print_if i.ppf_dump Clflags.dump_source Pprintast.signature
-
 let typecheck_intf info ast =
   Profile.(record_call typing) @@ fun () ->
   let tsg =
@@ -73,13 +68,19 @@ let emit_signature info ast tsg =
   Typemod.save_signature info.modulename tsg
     info.outputprefix info.sourcefile info.env sg
 
-let interface ~tool_name ~sourcefile ~outputprefix =
+let interface ~tool_name ~frontend ~sourcefile ~outputprefix =
+  let frontend = Option.value frontend ~default:Pparse.parse_interface in
+  let preprocessor = !Clflags.preprocessor in
+  let all_ppx = !Clflags.all_ppx in
   Compmisc.with_ppf_dump ~fileprefix:(outputprefix ^ ".cmi") @@ fun ppf_dump ->
   Profile.record_call sourcefile @@ fun () ->
   let info =
     init ppf_dump ~init_path:false ~tool_name ~sourcefile ~outputprefix
   in
-  let ast = parse_intf info in
+  let ast = frontend ~tool_name ~preprocessor ~all_ppx sourcefile
+    |> print_if info.ppf_dump Clflags.dump_parsetree Printast.interface
+    |> print_if info.ppf_dump Clflags.dump_source Pprintast.signature
+  in
   let tsg = typecheck_intf info ast in
   if not !Clflags.print_types then begin
     emit_signature info ast tsg
@@ -87,11 +88,6 @@ let interface ~tool_name ~sourcefile ~outputprefix =
 
 
 (** Frontend for a .ml file *)
-
-let parse_impl i =
-  Pparse.parse_implementation ~tool_name:i.tool_name i.sourcefile
-  |> print_if i.ppf_dump Clflags.dump_parsetree Printast.implementation
-  |> print_if i.ppf_dump Clflags.dump_source Pprintast.structure
 
 let typecheck_impl i parsetree =
   let always () = Stypes.dump (Some (annot i)) in
@@ -104,14 +100,20 @@ let typecheck_impl i parsetree =
       Printtyped.implementation_with_coercion
   )
 
-let implementation ~tool_name ~native ~backend ~sourcefile ~outputprefix =
+let implementation ~tool_name ~native ~frontend ~backend ~sourcefile ~outputprefix =
+  let frontend = Option.value frontend ~default:Pparse.parse_implementation in
+  let preprocessor = !Clflags.preprocessor in
+  let all_ppx = !Clflags.all_ppx in
   let suf, sufs = if native then ".cmx", [ cmx; obj ] else ".cmo", [ cmo ] in
   Compmisc.with_ppf_dump ~fileprefix:(outputprefix ^ suf) @@ fun ppf_dump ->
   let info =
     init ppf_dump ~init_path:native ~tool_name ~sourcefile ~outputprefix
   in
   Profile.record_call info.sourcefile @@ fun () ->
-  let parsed = parse_impl info in
+  let parsed = frontend ~tool_name ~preprocessor ~all_ppx info.sourcefile
+    |> print_if info.ppf_dump Clflags.dump_parsetree Printast.implementation
+    |> print_if info.ppf_dump Clflags.dump_source Pprintast.structure
+  in
   let typed = typecheck_impl info parsed in
   if not !Clflags.print_types then begin
     let exceptionally () =

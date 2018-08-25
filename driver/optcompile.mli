@@ -15,11 +15,18 @@
 
 (** Native compilation for .ml and .mli files. *)
 
-val interface: sourcefile:string -> outputprefix:string -> unit
+val interface
+  :  frontend:(Pparse.parse_intf_fun) option
+  -> sourcefile:string
+  -> outputprefix:string
+  -> unit
 
-val implementation:
-   backend:(module Backend_intf.S)
-   -> sourcefile:string -> outputprefix:string -> unit
+val implementation
+   :  frontend:(Pparse.parse_impl_fun) option
+   -> backend:(module Backend_intf.S)
+   -> sourcefile:string
+   -> outputprefix:string
+   -> unit
 
 (** {2 Internal functions} **)
 

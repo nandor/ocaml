@@ -254,8 +254,8 @@ let main () =
     begin try
       Compenv.process_deferred_actions
         (ppf,
-         Optcompile.implementation ~backend,
-         Optcompile.interface,
+         Optcompile.implementation ~frontend:None ~backend,
+         Optcompile.interface ~frontend:None,
          ".cmx",
          ".cmxa");
     with Arg.Bad msg ->

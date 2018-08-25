@@ -354,7 +354,11 @@ let preprocess_phrase ppf phr =
     match phr with
     | Ptop_def str ->
         let str =
-          Pparse.apply_rewriters_str ~restore:true ~tool_name:"ocaml" str
+          Pparse.apply_rewriters_str
+              ~restore:true
+              ~tool_name:"ocaml"
+              ~all_ppx:[]
+              str
         in
         let str =
           Pparse.ImplementationHooks.apply_hooks

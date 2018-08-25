@@ -23,8 +23,8 @@ type error =
 
 exception Error of error
 
-val preprocess : string -> string
-val remove_preprocessed : string -> unit
+val preprocess : preprocessor:string option -> string -> string
+val remove_preprocessed : preprocessor:string option -> string -> unit
 
 type 'a ast_kind =
 | Structure : Parsetree.structure ast_kind
@@ -33,28 +33,51 @@ type 'a ast_kind =
 val read_ast : 'a ast_kind -> string -> 'a
 val write_ast : 'a ast_kind -> string -> 'a -> unit
 
-val file : tool_name:string -> string ->
+val file : tool_name:string -> all_ppx:string list -> string ->
   (Lexing.lexbuf -> 'a) -> 'a ast_kind -> 'a
 
-val apply_rewriters: ?restore:bool -> tool_name:string ->
-  'a ast_kind -> 'a -> 'a
+val apply_rewriters
+  :  ?restore:bool
+  -> tool_name:string
+  -> all_ppx:string list
+  -> 'a ast_kind
+  -> 'a
+  -> 'a
   (** If [restore = true] (the default), cookies set by external
       rewriters will be kept for later calls. *)
 
-val apply_rewriters_str:
-  ?restore:bool -> tool_name:string -> Parsetree.structure ->
-  Parsetree.structure
-val apply_rewriters_sig:
-  ?restore:bool -> tool_name:string -> Parsetree.signature ->
-  Parsetree.signature
+val apply_rewriters_str
+  :  ?restore:bool
+  -> tool_name:string
+  -> all_ppx:string list
+  -> Parsetree.structure
+  -> Parsetree.structure
+val apply_rewriters_sig
+  :  ?restore:bool
+  -> tool_name:string
+  -> all_ppx:string list
+  -> Parsetree.signature
+  -> Parsetree.signature
 
 val report_error : formatter -> error -> unit
 
+type parse_impl_fun
+  =  tool_name:string
+  -> preprocessor:string option
+  -> all_ppx:string list
+  -> string
+  -> Parsetree.structure
 
-val parse_implementation:
-  tool_name:string -> string -> Parsetree.structure
-val parse_interface:
-  tool_name:string -> string -> Parsetree.signature
+val parse_implementation : parse_impl_fun
+
+type parse_intf_fun
+  =  tool_name:string
+  -> preprocessor:string option
+  -> all_ppx:string list
+  -> string
+  -> Parsetree.signature
+
+val parse_interface : parse_intf_fun
 
 (* [call_external_preprocessor sourcefile pp] *)
 val call_external_preprocessor : string -> string -> string

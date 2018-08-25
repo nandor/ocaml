@@ -279,9 +279,13 @@ let read_parse_and_extract parse_function extract_function def ast_kind
   Depend.pp_deps := [];
   Depend.free_structure_names := String.Set.empty;
   try
-    let input_file = Pparse.preprocess source_file in
+    let preprocessor = !Clflags.preprocessor in
+    let all_ppx = !Clflags.all_ppx in
+    let input_file = Pparse.preprocess ~preprocessor source_file in
     begin try
-      let ast = Pparse.file ~tool_name input_file parse_function ast_kind in
+      let ast =
+        Pparse.file ~tool_name ~all_ppx input_file parse_function ast_kind
+      in
       let bound_vars =
         List.fold_left
           (fun bv modname ->
@@ -289,10 +293,10 @@ let read_parse_and_extract parse_function extract_function def ast_kind
           !module_map ((* PR#7248 *) List.rev !Clflags.open_modules)
       in
       let r = extract_function bound_vars ast in
-      Pparse.remove_preprocessed input_file;
+      Pparse.remove_preprocessed ~preprocessor input_file;
       (!Depend.free_structure_names, r)
     with x ->
-      Pparse.remove_preprocessed input_file;
+      Pparse.remove_preprocessed ~preprocessor input_file;
       raise x
     end
   with x -> begin

@@ -37,9 +37,6 @@ val init :
 
 (** {2 Interfaces} *)
 
-val parse_intf : info -> Parsetree.signature
-(** [parse_intf info] parses an interface (usually an [.mli] file). *)
-
 val typecheck_intf : info -> Parsetree.signature -> Typedtree.signature
 (** [typecheck_intf info parsetree] typechecks an interface and returns
     the typedtree of the associated signature.
@@ -52,13 +49,13 @@ val emit_signature : info -> Parsetree.signature -> Typedtree.signature -> unit
 
 val interface :
   tool_name:string ->
-  sourcefile:string -> outputprefix:string -> unit
+  frontend:(Pparse.parse_intf_fun) option ->
+  sourcefile:string ->
+  outputprefix:string ->
+  unit
 (** The complete compilation pipeline for interfaces. *)
 
 (** {2 Implementations} *)
-
-val parse_impl : info -> Parsetree.structure
-(** [parse_impl info] parses an implementation (usually an [.ml] file). *)
 
 val typecheck_impl :
   info -> Parsetree.structure -> Typedtree.structure * Typedtree.module_coercion
@@ -70,6 +67,7 @@ val typecheck_impl :
 val implementation :
   tool_name:string ->
   native:bool ->
+  frontend:(Pparse.parse_impl_fun) option ->
   backend:(info -> Typedtree.structure * Typedtree.module_coercion -> unit) ->
   sourcefile:string ->
   outputprefix:string ->

@@ -15,21 +15,14 @@
 
 (** Bytecode compilation for .ml and .mli files. *)
 
-val interface:
-  sourcefile:string -> outputprefix:string -> unit
-val implementation:
-  sourcefile:string -> outputprefix:string -> unit
+val interface
+  :  frontend:(Pparse.parse_intf_fun) option
+  -> sourcefile:string
+  -> outputprefix:string
+  -> unit
 
-(** {2 Internal functions} **)
-
-val to_bytecode :
-  Compile_common.info ->
-  Typedtree.structure * Typedtree.module_coercion ->
-  Instruct.instruction list * Ident.Set.t
-(** [to_bytecode info typed] takes a typechecked implementation
-    and returns its bytecode.
-*)
-
-val emit_bytecode :
-  Compile_common.info -> Instruct.instruction list * Ident.Set.t -> unit
-(** [emit_bytecode bytecode] output the bytecode executable. *)
+val implementation
+  :  frontend:(Pparse.parse_impl_fun) option
+  -> sourcefile:string
+  -> outputprefix:string
+  -> unit

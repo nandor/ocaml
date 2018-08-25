@@ -139,8 +139,8 @@ let main () =
     begin try
       Compenv.process_deferred_actions
         (ppf,
-         Compile.implementation,
-         Compile.interface,
+         Compile.implementation ~frontend:None,
+         Compile.interface ~frontend:None,
          ".cmo",
          ".cma");
     with Arg.Bad msg ->

@@ -46,7 +46,7 @@ let initial_env () =
 (** Optionally preprocess a source file *)
 let preprocess sourcefile =
   try
-    Pparse.preprocess sourcefile
+    Pparse.preprocess ~preprocessor:!Clflags.preprocessor sourcefile
   with Pparse.Error err ->
     Format.eprintf "Preprocessing error@.%a@."
       Pparse.report_error err;
@@ -73,7 +73,7 @@ let process_implementation_file sourcefile =
   let env = initial_env () in
   try
     let parsetree =
-      Pparse.file ~tool_name inputfile
+      Pparse.file ~tool_name ~all_ppx:!Clflags.all_ppx inputfile
         (no_docstring Parse.implementation) Pparse.Structure
     in
     let typedtree =
@@ -104,7 +104,7 @@ let process_interface_file sourcefile =
   Env.set_unit_name modulename;
   let inputfile = preprocess sourcefile in
   let ast =
-    Pparse.file ~tool_name inputfile
+    Pparse.file ~tool_name ~all_ppx:!Clflags.all_ppx inputfile
       (no_docstring Parse.interface) Pparse.Signature
   in
   let sg = Typemod.type_interface sourcefile (initial_env()) ast in
@@ -138,6 +138,7 @@ let process_file sourcefile =
      print_string (Odoc_messages.analysing f) ;
      print_newline ();
     );
+  let preprocessor = !Clflags.preprocessor in
   match sourcefile with
     Odoc_global.Impl_file file ->
       (
@@ -158,7 +159,7 @@ let process_file sourcefile =
                 print_string Odoc_messages.ok;
                 print_newline ()
                );
-             Pparse.remove_preprocessed input_file;
+             Pparse.remove_preprocessed ~preprocessor input_file;
              Some file_module
        with
        | Sys_error s
@@ -187,7 +188,7 @@ let process_file sourcefile =
             print_string Odoc_messages.ok;
             print_newline ()
            );
-         Pparse.remove_preprocessed input_file;
+         Pparse.remove_preprocessed ~preprocessor input_file;
          Some file_module
        with
        | Sys_error s

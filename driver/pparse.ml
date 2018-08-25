@@ -34,16 +34,16 @@ let call_external_preprocessor sourcefile pp =
       end;
       tmpfile
 
-let preprocess sourcefile =
-  match !Clflags.preprocessor with
+let preprocess ~preprocessor sourcefile =
+  match preprocessor with
     None -> sourcefile
   | Some pp ->
       Profile.record "-pp"
         (call_external_preprocessor sourcefile) pp
 
 
-let remove_preprocessed inputfile =
-  match !Clflags.preprocessor with
+let remove_preprocessed ~preprocessor inputfile =
+  match preprocessor with
     None -> ()
   | Some _ -> Misc.remove_file inputfile
 
@@ -108,8 +108,8 @@ let rewrite kind ppxs ast =
   let fn = List.fold_left (apply_rewriter kind) fn (List.rev ppxs) in
   read_ast kind fn
 
-let apply_rewriters_str ?(restore = true) ~tool_name ast =
-  match !Clflags.all_ppx with
+let apply_rewriters_str ?(restore = true) ~tool_name ~all_ppx ast =
+  match all_ppx with
   | [] -> ast
   | ppxs ->
       let ast =
@@ -120,8 +120,8 @@ let apply_rewriters_str ?(restore = true) ~tool_name ast =
       in
       Ast_invariants.structure ast; ast
 
-let apply_rewriters_sig ?(restore = true) ~tool_name ast =
-  match !Clflags.all_ppx with
+let apply_rewriters_sig ?(restore = true) ~tool_name ~all_ppx ast =
+  match all_ppx with
   | [] -> ast
   | ppxs ->
       let ast =
@@ -132,13 +132,13 @@ let apply_rewriters_sig ?(restore = true) ~tool_name ast =
       in
       Ast_invariants.signature ast; ast
 
-let apply_rewriters ?restore ~tool_name
+let apply_rewriters ?restore ~tool_name ~all_ppx
     (type a) (kind : a ast_kind) (ast : a) : a =
   match kind with
   | Structure ->
-      apply_rewriters_str ?restore ~tool_name ast
+      apply_rewriters_str ?restore ~tool_name ~all_ppx ast
   | Signature ->
-      apply_rewriters_sig ?restore ~tool_name ast
+      apply_rewriters_sig ?restore ~tool_name ~all_ppx ast
 
 (* Parse a file or get a dumped syntax tree from it *)
 
@@ -165,7 +165,7 @@ let parse (type a) (kind : a ast_kind) lexbuf : a =
   | Structure -> Parse.implementation lexbuf
   | Signature -> Parse.interface lexbuf
 
-let file_aux ~tool_name inputfile (type a) parse_fun invariant_fun
+let file_aux ~tool_name ~all_ppx ~unsafe inputfile (type a) parse_fun invariant_fun
              (kind : a ast_kind) =
   let ast_magic = magic_of_kind kind in
   let (ic, is_ast_file) = open_and_check_magic inputfile ast_magic in
@@ -173,11 +173,11 @@ let file_aux ~tool_name inputfile (type a) parse_fun invariant_fun
     try
       if is_ast_file then begin
         Location.input_name := (input_value ic : string);
-        if !Clflags.unsafe then
+        if unsafe then
           Location.prerr_warning (Location.in_file !Location.input_name)
             Warnings.Unsafe_without_parsing;
         let ast = (input_value ic : a) in
-        if !Clflags.all_ppx = [] then invariant_fun ast;
+        if all_ppx = [] then invariant_fun ast;
         (* if all_ppx <> [], invariant_fun will be called by apply_rewriters *)
         ast
       end else begin
@@ -190,11 +190,18 @@ let file_aux ~tool_name inputfile (type a) parse_fun invariant_fun
   in
   close_in ic;
   Profile.record_call "-ppx" (fun () ->
-      apply_rewriters ~restore:false ~tool_name kind ast
+      apply_rewriters ~restore:false ~tool_name ~all_ppx kind ast
     )
 
-let file ~tool_name inputfile parse_fun ast_kind =
-  file_aux ~tool_name inputfile parse_fun ignore ast_kind
+let file ~tool_name ~all_ppx inputfile parse_fun ast_kind =
+  file_aux
+    ~tool_name
+    ~all_ppx
+    ~unsafe:!Clflags.unsafe
+    inputfile
+    parse_fun
+    ignore
+    ast_kind
 
 let report_error ppf = function
   | CannotRun cmd ->
@@ -211,14 +218,23 @@ let () =
       | _ -> None
     )
 
-let parse_file ~tool_name invariant_fun apply_hooks kind sourcefile =
+let parse_file ~tool_name ~preprocessor ~all_ppx ~unsafe
+    invariant_fun apply_hooks kind sourcefile =
   Location.input_name := sourcefile;
-  let inputfile = preprocess sourcefile in
+  let inputfile = preprocess ~preprocessor sourcefile in
   let ast =
-    Misc.try_finally (fun () ->
-        file_aux ~tool_name inputfile (parse kind) invariant_fun kind
+    Misc.try_finally
+      (fun () ->
+        file_aux
+          ~tool_name
+          ~all_ppx
+          ~unsafe
+          inputfile
+          (parse kind)
+          invariant_fun
+          kind
       )
-      ~always:(fun () -> remove_preprocessed inputfile)
+      ~always:(fun () -> remove_preprocessed ~preprocessor inputfile)
   in
   let ast = apply_hooks { Misc.sourcefile } ast in
   ast
@@ -230,11 +246,40 @@ module InterfaceHooks = Misc.MakeHooks(struct
     type t = Parsetree.signature
   end)
 
-let parse_implementation ~tool_name sourcefile =
+type parse_impl_fun
+  =  tool_name:string
+  -> preprocessor:string option
+  -> all_ppx:string list
+  -> string
+  -> Parsetree.structure
+
+let parse_implementation ~tool_name ~preprocessor ~all_ppx sourcefile =
   Profile.record_call "parsing" (fun () ->
-    parse_file ~tool_name Ast_invariants.structure
-      ImplementationHooks.apply_hooks Structure sourcefile)
-let parse_interface ~tool_name sourcefile =
+    parse_file
+      ~tool_name
+      ~preprocessor
+      ~all_ppx
+      ~unsafe:!Clflags.unsafe
+      Ast_invariants.structure
+      ImplementationHooks.apply_hooks
+      Structure
+      sourcefile)
+
+type parse_intf_fun
+  =  tool_name:string
+  -> preprocessor:string option
+  -> all_ppx:string list
+  -> string
+  -> Parsetree.signature
+
+let parse_interface ~tool_name ~preprocessor ~all_ppx sourcefile =
   Profile.record_call "parsing" (fun () ->
-    parse_file ~tool_name Ast_invariants.signature
-      InterfaceHooks.apply_hooks Signature sourcefile)
+    parse_file
+      ~tool_name
+      ~preprocessor
+      ~all_ppx
+      ~unsafe:!Clflags.unsafe
+      Ast_invariants.signature
+      InterfaceHooks.apply_hooks
+      Signature
+      sourcefile)
