@@ -2167,6 +2167,8 @@ let imports () =
 let is_imported_opaque s =
   String.Set.mem s !imported_opaque_units
 
+let output_cmi_hook = ref (fun _ _ -> ())
+
 (* Save a signature to a file *)
 
 let save_signature_with_imports ~deprecated sg modname filename imports =
@@ -2190,6 +2192,7 @@ let save_signature_with_imports ~deprecated sg modname filename imports =
         cmi_crcs = imports;
         cmi_flags = flags;
       } in
+      !output_cmi_hook filename cmi;
       let crc =
         output_to_file_via_temporary (* see MPR#7472, MPR#4991 *)
           ~mode: [Open_binary] filename

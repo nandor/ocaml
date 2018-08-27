@@ -222,6 +222,9 @@ val save_signature_with_imports:
         (* Arguments: signature, module name, file name,
            imported units with their CRCs. *)
 
+(* Hook called when outputting a signature. *)
+val output_cmi_hook: (string -> Cmi_format.cmi_infos -> unit) ref
+
 (* Return the CRC of the interface of the given compilation unit *)
 
 val crc_of_unit: string -> Digest.t
@@ -346,3 +349,4 @@ module Persistent_signature : sig
       it from memory, for instance to build a self-contained toplevel. *)
   val load : (unit_name:string -> t option) ref
 end
+
