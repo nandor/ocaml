@@ -213,12 +213,12 @@ val read_signature: string -> string -> signature
         (* Arguments: module name, file name. Results: signature. *)
 val save_signature:
   deprecated:string option -> signature -> string -> string ->
-  Cmi_format.cmi_infos
+  Cmi_format.cmi_infos * (string * Digest.t option)
         (* Arguments: signature, module name, file name. *)
 val save_signature_with_imports:
   deprecated:string option ->
   signature -> string -> string -> (string * Digest.t option) list
-  -> Cmi_format.cmi_infos
+  -> Cmi_format.cmi_infos * (string * Digest.t option)
         (* Arguments: signature, module name, file name,
            imported units with their CRCs. *)
 
@@ -231,7 +231,9 @@ val crc_of_unit: string -> Digest.t
 
 (* Return the set of compilation units imported, with their CRC *)
 
-val imports: unit -> (string * Digest.t option) list
+type import_list = (string * Digest.t option) list
+
+val imports: unit -> import_list
 
 (* [is_imported_opaque md] returns true if [md] is an opaque imported module  *)
 val is_imported_opaque: string -> bool
@@ -344,9 +346,11 @@ module Persistent_signature : sig
     { filename : string; (** Name of the file containing the signature. *)
       cmi : Cmi_format.cmi_infos }
 
+  val read : (filename:string -> Cmi_format.cmi_infos) ref
+
   (** Function used to load a persistent signature. The default is to look for
       the .cmi file in the load path. This function can be overridden to load
       it from memory, for instance to build a self-contained toplevel. *)
-  val load : (unit_name:string -> t option) ref
+  val load : unit_name:string -> t option
 end
 

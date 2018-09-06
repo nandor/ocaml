@@ -76,11 +76,11 @@ let process_implementation_file sourcefile =
       Pparse.file ~tool_name ~all_ppx:!Clflags.all_ppx inputfile
         (no_docstring Parse.implementation) Pparse.Structure
     in
-    let typedtree =
-      Typemod.type_implementation
-        sourcefile prefixname modulename env parsetree
+    (* TODO: we are not writing .cmt anymore... *)
+    let (str, coercion, _) =
+      Typemod.type_implementation sourcefile modulename env parsetree
     in
-    (Some (parsetree, typedtree), inputfile)
+    (Some (parsetree, (str, coercion)), inputfile)
   with
     e ->
       match e with

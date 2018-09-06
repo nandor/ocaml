@@ -37,10 +37,10 @@ val init :
 
 (** {2 Interfaces} *)
 
-val typecheck_intf : info -> Parsetree.signature -> Typedtree.signature
-(** [typecheck_intf info parsetree] typechecks an interface and returns
-    the typedtree of the associated signature.
-*)
+type typecheck_intf_fun
+  =  info
+  -> Parsetree.signature
+  -> Typedtree.signature
 
 val emit_signature : info -> Parsetree.signature -> Typedtree.signature -> unit
 (** [emit_signature info parsetree typedtree] emits the [.cmi] file
@@ -50,6 +50,7 @@ val emit_signature : info -> Parsetree.signature -> Typedtree.signature -> unit
 val interface :
   tool_name:string ->
   frontend:(Pparse.parse_intf_fun) option ->
+  typing:typecheck_intf_fun option ->
   sourcefile:string ->
   outputprefix:string ->
   unit
@@ -57,8 +58,11 @@ val interface :
 
 (** {2 Implementations} *)
 
-val typecheck_impl :
-  info -> Parsetree.structure -> Typedtree.structure * Typedtree.module_coercion
+type typecheck_impl_fun
+  =  info
+  -> Parsetree.structure
+  -> Typedtree.structure * Typedtree.module_coercion * Types.signature * Env.import_list
+
 (** [typecheck_impl info parsetree] typechecks an implementation and returns
     the typedtree of the associated module, along with a coercion against
     its public interface.
@@ -68,7 +72,8 @@ val implementation :
   tool_name:string ->
   native:bool ->
   frontend:(Pparse.parse_impl_fun) option ->
-  backend:(info -> Typedtree.structure * Typedtree.module_coercion -> unit) ->
+  typing:typecheck_impl_fun option ->
+  backend:(info -> Typedtree.structure * Typedtree.module_coercion -> Env.import_list -> unit) ->
   sourcefile:string ->
   outputprefix:string ->
   unit

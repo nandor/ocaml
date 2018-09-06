@@ -163,7 +163,7 @@ let read_file obj_name =
   if Filename.check_suffix file_name ".cmx" then begin
     (* This is a .cmx file. It must be linked in any case.
        Read the infos to see which modules it requires. *)
-    let (info, crc) = read_unit_info file_name in
+    let (info, crc) = !read_unit_info file_name in
     Unit (file_name,info,crc)
   end
   else if Filename.check_suffix file_name ".cmxa" then begin
@@ -229,9 +229,13 @@ let make_startup_file ~ppf_dump units_list =
                let intf_crc =
                  try
                    match List.assoc unit.ui_name unit.ui_imports_cmi with
-                     None -> assert false
+                     None ->
+                      flush_all();
+                      assert false
                    | Some crc -> crc
-                 with Not_found -> assert false
+                 with Not_found ->
+                  flush_all ();
+                  assert false
                in
                  (unit.ui_name, intf_crc, crc, unit.ui_defines))
           units_list));

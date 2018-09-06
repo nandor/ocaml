@@ -39,7 +39,8 @@ let check_noadd tbl name crc source =
   with Not_found ->
     raise (Not_available name)
 
-let set tbl name crc source = Hashtbl.add tbl name (crc, source)
+let set tbl name crc source =
+    Hashtbl.add tbl name (crc, source)
 
 let source tbl name = snd (Hashtbl.find tbl name)
 

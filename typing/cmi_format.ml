@@ -37,12 +37,11 @@ let input_cmi ic =
   let (name, sign) = input_value ic in
   let crcs = input_value ic in
   let flags = input_value ic in
-  {
-      cmi_name = name;
-      cmi_sign = sign;
-      cmi_crcs = crcs;
-      cmi_flags = flags;
-    }
+  { cmi_name = name
+  ; cmi_sign = sign
+  ; cmi_crcs = crcs
+  ; cmi_flags = flags
+  }
 
 let read_cmi filename =
   let ic = open_in_bin filename in

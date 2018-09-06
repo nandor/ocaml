@@ -26,7 +26,7 @@ let (|>>) (x, y) f = (x, f y)
 
 (** Native compilation backend for .ml files. *)
 
-let flambda i backend typed =
+let flambda i backend typed imports =
   if !Clflags.classic_inlining then begin
     Clflags.default_simplify_rounds := 1;
     Clflags.use_inlining_arguments_set Clflags.classic_arguments;
@@ -54,9 +54,9 @@ let flambda i backend typed =
         ~module_initializer:lam)
     |> Asmgen.compile_implementation_flambda
       i.outputprefix ~required_globals ~backend ~ppf_dump:i.ppf_dump;
-    Compilenv.save_unit_info (cmx i))
+    Compilenv.save_unit_info (cmx i) imports)
 
-let clambda i typed =
+let clambda i typed imports =
   Clflags.use_inlining_arguments_set Clflags.classic_arguments;
   typed
   |> Profile.(record transl)
@@ -69,13 +69,13 @@ let clambda i typed =
        |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.program
        |> Asmgen.compile_implementation_clambda
          i.outputprefix ~ppf_dump:i.ppf_dump;
-       Compilenv.save_unit_info (cmx i))
+       Compilenv.save_unit_info (cmx i) imports)
 
-let implementation ~frontend ~backend =
-  Compile_common.implementation ~tool_name ~frontend
-    ~native:true ~backend:(fun info typed ->
+let implementation ~frontend ~typing ~backend =
+  Compile_common.implementation ~tool_name ~frontend ~typing
+    ~native:true ~backend:(fun info typed imports ->
       Compilenv.reset ?packname:!Clflags.for_package info.modulename;
       if Config.flambda
-      then flambda info backend typed
-      else clambda info typed
+      then flambda info backend typed imports
+      else clambda info typed imports
     )

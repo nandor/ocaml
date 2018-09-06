@@ -29,8 +29,8 @@ val type_toplevel_phrase:
   Env.t -> Parsetree.structure ->
   Typedtree.structure * Types.signature * signature_simplification_info * Env.t
 val type_implementation:
-  string -> string -> string -> Env.t -> Parsetree.structure ->
-  Typedtree.structure * Typedtree.module_coercion
+  string -> string -> Env.t -> Parsetree.structure ->
+  Typedtree.structure * Typedtree.module_coercion * Types.signature
 val type_interface:
         string -> Env.t -> Parsetree.signature -> Typedtree.signature
 val transl_signature:
@@ -120,6 +120,6 @@ val report_error: Env.t -> formatter -> error -> unit
 
 
 module ImplementationHooks : Misc.HookSig
-  with type t = Typedtree.structure * Typedtree.module_coercion
+  with type t = Typedtree.structure * Typedtree.module_coercion * Types.signature
 module InterfaceHooks : Misc.HookSig
   with type t = Typedtree.signature

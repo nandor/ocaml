@@ -700,17 +700,20 @@ let save_pers_struct crc ps =
         | Opaque -> add_imported_opaque modname)
     ps.ps_flags;
   Consistbl.set crc_units modname crc ps.ps_filename;
-  add_import modname
+  add_import modname;
+  (modname, Some crc)
 
 module Persistent_signature = struct
   type t =
     { filename : string;
       cmi : Cmi_format.cmi_infos }
 
-  let load = ref (fun ~unit_name ->
+  let read = ref (fun ~filename -> read_cmi filename)
+
+  let load ~unit_name =
     match find_in_path_uncap !load_path (unit_name ^ ".cmi") with
-    | filename -> Some { filename; cmi = read_cmi filename }
-    | exception Not_found -> None)
+    | filename -> Some { filename; cmi = !read ~filename }
+    | exception Not_found -> None
 end
 
 let acknowledge_pers_struct check modname
@@ -756,7 +759,7 @@ let acknowledge_pers_struct check modname
 
 let read_pers_struct check modname filename =
   add_import modname;
-  let cmi = read_cmi filename in
+  let cmi = !Persistent_signature.read ~filename in
   acknowledge_pers_struct check modname
     { Persistent_signature.filename; cmi }
 
@@ -770,7 +773,7 @@ let find_pers_struct check name =
     | Cannot_load_cmis _ -> raise Not_found
     | Can_load_cmis ->
         let ps =
-          match !Persistent_signature.load ~unit_name:name with
+          match Persistent_signature.load ~unit_name:name with
           | Some ps -> ps
           | None ->
             Hashtbl.add persistent_structures name None;
@@ -2159,6 +2162,7 @@ let crc_of_unit name =
     | Some crc -> crc
 
 (* Return the list of imported interfaces with their CRCs *)
+type import_list = (string * Digest.t option) list
 
 let imports () =
   Consistbl.extract (String.Set.elements !imported_units) crc_units
@@ -2192,11 +2196,13 @@ let save_signature_with_imports ~deprecated sg modname filename imports =
         cmi_crcs = imports;
         cmi_flags = flags;
       } in
-      !output_cmi_hook filename cmi;
       let crc =
         output_to_file_via_temporary (* see MPR#7472, MPR#4991 *)
           ~mode: [Open_binary] filename
           (fun temp_filename oc -> output_cmi temp_filename oc cmi) in
+      !output_cmi_hook filename
+        { cmi with cmi_crcs = (modname, Some crc) :: imports
+        };
       (* Enter signature in persistent table so that imported_unit()
          will also return its crc *)
       let comps =
@@ -2211,8 +2217,8 @@ let save_signature_with_imports ~deprecated sg modname filename imports =
           ps_filename = filename;
           ps_flags = cmi.cmi_flags;
         } in
-      save_pers_struct crc ps;
-      cmi
+      let import = save_pers_struct crc ps in
+      cmi, import
     )
     ~exceptionally:(fun () -> remove_file filename)
 

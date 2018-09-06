@@ -46,7 +46,7 @@ let read_member_info pack_path file = (
     if Filename.check_suffix file ".cmi" then
       PM_intf
     else begin
-      let (info, crc) = Compilenv.read_unit_info file in
+      let (info, crc) = !Compilenv.read_unit_info file in
       if info.ui_name <> name
       then raise(Error(Illegal_renaming(name, file, info.ui_name)));
       if info.ui_symbol <>
@@ -216,7 +216,7 @@ let build_package_cmx members cmxfile =
           List.exists (fun info -> info.ui_force_link) units;
       ui_export_info;
     } in
-  Compilenv.write_unit_info pkg_infos cmxfile
+  ignore (Compilenv.write_unit_info pkg_infos cmxfile)
 
 (* Make the .cmx and the .o for the package *)
 

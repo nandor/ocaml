@@ -225,6 +225,10 @@ let backup () = !current
 
 let restore x = current := x
 
+let context f =
+  let initial = backup () in
+  Misc.try_finally f ~always:(fun () -> restore initial)
+
 let is_active x = not !disabled && (!current).active.(number x);;
 let is_error x = not !disabled && (!current).error.(number x);;
 

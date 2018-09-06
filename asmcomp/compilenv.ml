@@ -155,7 +155,7 @@ let symbol_in_current_unit name =
    && name.[lp] = '_'
    && name.[lp + 1] = '_')
 
-let read_unit_info filename =
+let read_unit_info = ref (fun filename ->
   let ic = open_in_bin filename in
   try
     let buffer = really_input_string ic (String.length cmx_magic_number) in
@@ -169,7 +169,7 @@ let read_unit_info filename =
     (ui, crc)
   with End_of_file | Failure _ ->
     close_in ic;
-    raise(Error(Corrupted_unit_info(filename)))
+    raise(Error(Corrupted_unit_info(filename))))
 
 let read_library_info filename =
   let ic = open_in_bin filename in
@@ -197,7 +197,7 @@ let get_global_info global_ident = (
           try
             let filename =
               find_in_path_uncap !load_path (modname ^ ".cmx") in
-            let (ui, crc) = read_unit_info filename in
+            let (ui, crc) = !read_unit_info filename in
             if ui.ui_name <> modname then
               raise(Error(Illegal_renaming(modname, ui.ui_name, filename)));
             (Some ui, Some crc)
@@ -339,11 +339,12 @@ let write_unit_info info filename =
   flush oc;
   let crc = Digest.file filename in
   Digest.output oc crc;
-  close_out oc
+  close_out oc;
+  crc
 
-let save_unit_info filename =
-  current_unit.ui_imports_cmi <- Env.imports();
-  write_unit_info current_unit filename
+let save_unit_info filename imports =
+  current_unit.ui_imports_cmi <- imports;
+  ignore (write_unit_info current_unit filename)
 
 let current_unit () =
   match Compilation_unit.get_current () with

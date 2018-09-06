@@ -16,13 +16,15 @@
 (** Bytecode compilation for .ml and .mli files. *)
 
 val interface
-  :  frontend:(Pparse.parse_intf_fun) option
+  :  frontend:Pparse.parse_intf_fun option
+  -> typing:Compile_common.typecheck_intf_fun option
   -> sourcefile:string
   -> outputprefix:string
   -> unit
 
 val implementation
-  :  frontend:(Pparse.parse_impl_fun) option
+  :  frontend:Pparse.parse_impl_fun option
+  -> typing:Compile_common.typecheck_impl_fun option
   -> sourcefile:string
   -> outputprefix:string
   -> unit

@@ -41,26 +41,21 @@ let init ppf_dump ~init_path ~tool_name ~sourcefile ~outputprefix =
 
 (** Compile a .mli file *)
 
+type typecheck_intf_fun
+  =  info
+  -> Parsetree.signature
+  -> Typedtree.signature
+
 let typecheck_intf info ast =
-  Profile.(record_call typing) @@ fun () ->
-  let tsg =
-    ast
-    |> Typemod.type_interface info.sourcefile info.env
-    |> print_if info.ppf_dump Clflags.dump_typedtree Printtyped.interface
-  in
+  let tsg = ast |> Typemod.type_interface info.sourcefile info.env in
   let sg = tsg.Typedtree.sig_type in
-  if !Clflags.print_types then
-    Printtyp.wrap_printing_env ~error:false info.env (fun () ->
-        Format.(fprintf std_formatter) "%a@."
-          (Printtyp.printed_signature info.sourcefile)
-          sg);
   ignore (Includemod.signatures info.env sg sg);
   Typecore.force_delayed_checks ();
   Warnings.check_fatal ();
   tsg
 
 let emit_signature info ast tsg =
-  let sg =
+  let sg, _ =
     let deprecated = Builtin_attributes.deprecated_of_sig ast in
     Env.save_signature ~deprecated tsg.Typedtree.sig_type
       info.modulename (info.outputprefix ^ ".cmi")
@@ -68,8 +63,9 @@ let emit_signature info ast tsg =
   Typemod.save_signature info.modulename tsg
     info.outputprefix info.sourcefile info.env sg
 
-let interface ~tool_name ~frontend ~sourcefile ~outputprefix =
+let interface ~tool_name ~frontend ~typing ~sourcefile ~outputprefix =
   let frontend = Option.value frontend ~default:Pparse.parse_interface in
+  let typing = Option.value typing ~default:typecheck_intf in
   let preprocessor = !Clflags.preprocessor in
   let all_ppx = !Clflags.all_ppx in
   Compmisc.with_ppf_dump ~fileprefix:(outputprefix ^ ".cmi") @@ fun ppf_dump ->
@@ -81,7 +77,14 @@ let interface ~tool_name ~frontend ~sourcefile ~outputprefix =
     |> print_if info.ppf_dump Clflags.dump_parsetree Printast.interface
     |> print_if info.ppf_dump Clflags.dump_source Pprintast.signature
   in
-  let tsg = typecheck_intf info ast in
+  let tsg = (Profile.(record typing) typing) info ast
+    |> print_if info.ppf_dump Clflags.dump_typedtree Printtyped.interface
+  in
+  if !Clflags.print_types then
+    Printtyp.wrap_printing_env ~error:false info.env (fun () ->
+        Format.(fprintf std_formatter) "%a@."
+          (Printtyp.printed_signature info.sourcefile)
+          tsg.Typedtree.sig_type);
   if not !Clflags.print_types then begin
     emit_signature info ast tsg
   end
@@ -89,18 +92,83 @@ let interface ~tool_name ~frontend ~sourcefile ~outputprefix =
 
 (** Frontend for a .ml file *)
 
-let typecheck_impl i parsetree =
-  let always () = Stypes.dump (Some (annot i)) in
-  Misc.try_finally ~always (fun () ->
-    parsetree
-    |> Profile.(record typing)
-      (Typemod.type_implementation
-         i.sourcefile i.outputprefix i.modulename i.env)
-    |> print_if i.ppf_dump Clflags.dump_typedtree
-      Printtyped.implementation_with_coercion
-  )
+type typecheck_impl_fun
+  =  info
+  -> Parsetree.structure
+  -> Typedtree.structure * Typedtree.module_coercion * Types.signature * Env.import_list
 
-let implementation ~tool_name ~native ~frontend ~backend ~sourcefile ~outputprefix =
+let typecheck_impl type_impl i ast =
+  let { sourcefile; outputprefix; modulename; env } = i in
+  let sourceintf =
+    Filename.remove_extension sourcefile ^ !Config.interface_suffix
+  in
+  let tst = Misc.try_finally (fun () ->
+    let str, coercion, simple_sg, imports = type_impl i ast in
+    let extra_import =
+      if not !Clflags.print_types then begin
+        let intf_exists = Sys.file_exists sourceintf in
+        let cmi, imports =
+          if not (intf_exists || !Clflags.dont_write_files) then
+            (* Save the signature *)
+            let deprecated = Builtin_attributes.deprecated_of_str ast in
+            let cmi, import =
+              Env.save_signature
+                ~deprecated
+                simple_sg
+                modulename
+                (outputprefix ^ ".cmi")
+            in
+            Some cmi, import :: imports
+          else if intf_exists then
+            (* This is a total hack to load crcs of the other intf. *)
+            let intf_file =
+              Misc.find_in_path_uncap !Config.load_path (modulename ^ ".cmi")
+            in
+            ignore (Env.read_signature modulename intf_file);
+
+            (* Absolute total nightmare: we might load some extra imports *)
+            let additional_imports = Env.imports () in
+            let all_imports = List.append
+              (imports |> List.map (fun (k, v) ->
+                try (k, List.assoc k additional_imports)
+                with Not_found -> (k, v)))
+              (additional_imports |> List.filter (fun (k, _) ->
+                not (List.exists (fun (k2, _) -> k == k2) imports)
+              ))
+            in
+            None, all_imports |> List.sort (fun (ka, _) (kb, _) -> String.compare ka kb)
+          else
+            None, imports
+        in
+        Cmt_format.save_cmt
+          (outputprefix ^ ".cmt")
+          modulename
+          (Cmt_format.Implementation str)
+          (Some sourcefile)
+          env
+          cmi;
+        imports
+      end else
+        imports
+    in
+    (str, coercion, extra_import)
+  )
+  ~always:(fun () -> Stypes.dump (Some (annot i)))
+  ~exceptionally:(fun () ->
+    let saved_types = Array.of_list (Cmt_format.get_saved_types ()) in
+    Cmt_format.save_cmt
+      (outputprefix ^ ".cmt")
+      modulename
+      (Cmt_format.Partial_implementation saved_types)
+      (Some sourcefile)
+      env
+      None
+  )
+  in
+  Warnings.check_fatal ();
+  tst
+
+let implementation ~tool_name ~native ~frontend ~typing ~backend ~sourcefile ~outputprefix =
   let frontend = Option.value frontend ~default:Pparse.parse_implementation in
   let preprocessor = !Clflags.preprocessor in
   let all_ppx = !Clflags.all_ppx in
@@ -114,11 +182,21 @@ let implementation ~tool_name ~native ~frontend ~backend ~sourcefile ~outputpref
     |> print_if info.ppf_dump Clflags.dump_parsetree Printast.implementation
     |> print_if info.ppf_dump Clflags.dump_source Pprintast.structure
   in
-  let typed = typecheck_impl info parsed in
+  let typing = Option.value typing ~default:(fun info ast ->
+    let st, coer, sg =
+      Typemod.type_implementation info.sourcefile info.modulename info.env ast
+    in
+    (st, coer, sg, Env.imports ())
+  ) in
+  let ts, coer, imports =
+    (Profile.(record typing) (typecheck_impl typing)) info parsed
+    |> print_if info.ppf_dump Clflags.dump_typedtree
+        (fun ppf (ts, coer, _) -> Printtyped.implementation_with_coercion ppf (ts, coer))
+  in
   if not !Clflags.print_types then begin
     let exceptionally () =
       List.iter (fun suf -> remove_file (suf info)) sufs;
     in
-    Misc.try_finally ~exceptionally (fun () -> backend info typed)
-  end;
-  Warnings.check_fatal ();
+    Misc.try_finally ~exceptionally (fun () -> backend info (ts, coer) imports)
+  end
+

@@ -126,11 +126,11 @@ val snapshot: unit -> structured_constants
 val backtrack: structured_constants -> unit
         (* clambda-only *)
 
-val read_unit_info: string -> unit_infos * Digest.t
+val read_unit_info: (string -> unit_infos * Digest.t) ref
         (* Read infos and MD5 from a [.cmx] file. *)
-val write_unit_info: unit_infos -> string -> unit
+val write_unit_info: unit_infos -> string -> Digest.t
         (* Save the given infos in the given file *)
-val save_unit_info: string -> unit
+val save_unit_info: string -> Env.import_list -> unit
         (* Save the infos for the current unit in the given file *)
 val cache_unit_info: unit_infos -> unit
         (* Enter the given infos in the cache.  The infos will be
