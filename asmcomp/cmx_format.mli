@@ -34,17 +34,16 @@ type export_info =
   | Flambda of Export_info.t
 
 type unit_infos =
-  { mutable ui_name: string;                    (* Name of unit implemented *)
-    mutable ui_symbol: string;            (* Prefix for symbols *)
-    mutable ui_defines: string list;      (* Unit and sub-units implemented *)
-    mutable ui_imports_cmi:
-              (string * Digest.t option) list; (* Interfaces imported *)
-    mutable ui_imports_cmx:(string * Digest.t option) list; (* Infos imported *)
-    mutable ui_curry_fun: int list;             (* Currying functions needed *)
-    mutable ui_apply_fun: int list;             (* Apply functions needed *)
-    mutable ui_send_fun: int list;              (* Send functions needed *)
-    mutable ui_export_info: export_info;
-    mutable ui_force_link: bool }               (* Always linked *)
+  { ui_name: string;                    (* Name of unit implemented *)
+    ui_symbol: string;            (* Prefix for symbols *)
+    ui_defines: string list;      (* Unit and sub-units implemented *)
+    ui_imports_cmi: (string * Digest.t option) list; (* Interfaces imported *)
+    ui_imports_cmx:(string * Digest.t option) list; (* Infos imported *)
+    ui_curry_fun: int list;             (* Currying functions needed *)
+    ui_apply_fun: int list;             (* Apply functions needed *)
+    ui_send_fun: int list;              (* Send functions needed *)
+    ui_export_info: export_info;
+    ui_force_link: bool }               (* Always linked *)
 
 (* Each .a library has a matching .cmxa file that provides the following
    infos on the library: *)

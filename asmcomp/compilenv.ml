@@ -75,7 +75,7 @@ let default_ui_export_info =
   else
     Cmx_format.Clambda Value_unknown
 
-let current_unit =
+let current_unit = ref
   { ui_name = "";
     ui_symbol = "";
     ui_defines = [];
@@ -106,31 +106,35 @@ let unit_id_from_name name = Ident.create_persistent name
 let concat_symbol unitname id =
   unitname ^ "__" ^ id
 
-let make_symbol ?(unitname = current_unit.ui_symbol) idopt =
+let make_symbol ?(unitname = !current_unit.ui_symbol) idopt =
   let prefix = "caml" ^ unitname in
   match idopt with
   | None -> prefix
   | Some id -> concat_symbol prefix id
 
 let current_unit_linkage_name () =
-  Linkage_name.create (make_symbol ~unitname:current_unit.ui_symbol None)
+  Linkage_name.create (make_symbol ~unitname:!current_unit.ui_symbol None)
 
 let reset ?packname name =
   Hashtbl.clear global_infos_table;
   Set_of_closures_id.Tbl.clear imported_sets_of_closures_table;
   let symbol = symbolname_for_pack packname name in
-  current_unit.ui_name <- name;
-  current_unit.ui_symbol <- symbol;
-  current_unit.ui_defines <- [symbol];
-  current_unit.ui_imports_cmi <- [];
-  current_unit.ui_imports_cmx <- [];
-  current_unit.ui_curry_fun <- [];
-  current_unit.ui_apply_fun <- [];
-  current_unit.ui_send_fun <- [];
-  current_unit.ui_force_link <- !Clflags.link_everything;
   Hashtbl.clear exported_constants;
   structured_constants := structured_constants_empty;
-  current_unit.ui_export_info <- default_ui_export_info;
+
+  current_unit :=
+    { ui_name = name
+    ; ui_symbol = symbol
+    ; ui_defines = [symbol]
+    ; ui_imports_cmi = []
+    ; ui_imports_cmx = []
+    ; ui_curry_fun = []
+    ; ui_apply_fun = []
+    ; ui_send_fun = []
+    ; ui_force_link = !Clflags.link_everything
+    ; ui_export_info = default_ui_export_info
+    };
+
   merged_environment := Export_info.empty;
   Hashtbl.clear export_infos_table;
   let compilation_unit =
@@ -141,13 +145,13 @@ let reset ?packname name =
   Compilation_unit.set_current compilation_unit
 
 let current_unit_infos () =
-  current_unit
+  !current_unit
 
 let current_unit_name () =
-  current_unit.ui_name
+  !current_unit.ui_name
 
 let symbol_in_current_unit name =
-  let prefix = "caml" ^ current_unit.ui_symbol in
+  let prefix = "caml" ^ !current_unit.ui_symbol in
   name = prefix ||
   (let lp = String.length prefix in
    String.length name >= 2 + lp
@@ -185,8 +189,8 @@ let read_library_info filename =
 
 let get_global_info global_ident = (
   let modname = Ident.name global_ident in
-  if modname = current_unit.ui_name then
-    Some current_unit
+  if modname = !current_unit.ui_name then
+    Some !current_unit
   else begin
     try
       Hashtbl.find global_infos_table modname
@@ -207,8 +211,8 @@ let get_global_info global_ident = (
               (None, None)
           end
       in
-      current_unit.ui_imports_cmx <-
-        (modname, crc) :: current_unit.ui_imports_cmx;
+      let ui_imports_cmx = (modname, crc) :: !current_unit.ui_imports_cmx in
+      current_unit := { !current_unit with ui_imports_cmx };
       Hashtbl.add global_infos_table modname infos;
       infos
   end
@@ -219,9 +223,9 @@ let cache_unit_info ui =
 
 (* Return the approximation of a global identifier *)
 
-let get_clambda_approx ui =
+let get_clambda_approx { ui_export_info } =
   assert(not Config.flambda);
-  match ui.ui_export_info with
+  match ui_export_info with
   | Flambda _ -> assert false
   | Clambda approx -> approx
 
@@ -229,8 +233,8 @@ let toplevel_approx :
   (string, Clambda.value_approximation) Hashtbl.t = Hashtbl.create 16
 
 let record_global_approx_toplevel () =
-  Hashtbl.add toplevel_approx current_unit.ui_name
-    (get_clambda_approx current_unit)
+  Hashtbl.add toplevel_approx !current_unit.ui_name
+    (get_clambda_approx !current_unit)
 
 let global_approx id =
   if Ident.is_predef_exn id then Clambda.Value_unknown
@@ -279,19 +283,19 @@ let symbol_for_global' id =
 
 let set_global_approx approx =
   assert(not Config.flambda);
-  current_unit.ui_export_info <- Clambda approx
+  current_unit := { !current_unit with ui_export_info = Clambda approx }
 
 (* Exporting and importing cross module information *)
 
-let get_flambda_export_info ui =
+let get_flambda_export_info { ui_export_info } =
   assert(Config.flambda);
-  match ui.ui_export_info with
+  match ui_export_info with
   | Clambda _ -> assert false
   | Flambda ei -> ei
 
 let set_export_info export_info =
   assert(Config.flambda);
-  current_unit.ui_export_info <- Flambda export_info
+  current_unit := { !current_unit with ui_export_info = Flambda export_info }
 
 let approx_for_global comp_unit =
   let id = Compilation_unit.get_persistent_ident comp_unit in
@@ -318,17 +322,20 @@ let approx_env () = !merged_environment
 (* Record that a currying function or application function is needed *)
 
 let need_curry_fun n =
-  if not (List.mem n current_unit.ui_curry_fun) then
-    current_unit.ui_curry_fun <- n :: current_unit.ui_curry_fun
+  if not (List.mem n !current_unit.ui_curry_fun) then
+    let ui_curry_fun = n :: !current_unit.ui_curry_fun in
+    current_unit := { !current_unit with ui_curry_fun }
 
 let need_apply_fun n =
   assert(n > 0);
-  if not (List.mem n current_unit.ui_apply_fun) then
-    current_unit.ui_apply_fun <- n :: current_unit.ui_apply_fun
+  if not (List.mem n !current_unit.ui_apply_fun) then
+    let ui_apply_fun = n :: !current_unit.ui_apply_fun in
+    current_unit := { !current_unit with ui_apply_fun }
 
 let need_send_fun n =
-  if not (List.mem n current_unit.ui_send_fun) then
-    current_unit.ui_send_fun <- n :: current_unit.ui_send_fun
+  if not (List.mem n !current_unit.ui_send_fun) then
+    let ui_send_fun = n :: !current_unit.ui_send_fun in
+    current_unit := { !current_unit with ui_send_fun }
 
 (* Write the description of the current unit *)
 
@@ -342,9 +349,9 @@ let write_unit_info info filename =
   close_out oc;
   crc
 
-let save_unit_info filename imports =
-  current_unit.ui_imports_cmi <- imports;
-  ignore (write_unit_info current_unit filename)
+let save_unit_info filename ui_imports_cmi =
+  current_unit := { !current_unit with ui_imports_cmi };
+  ignore (write_unit_info !current_unit filename)
 
 let current_unit () =
   match Compilation_unit.get_current () with
