@@ -385,7 +385,7 @@ static void writecode64(int code, intnat val)
 
 /* Marshal the given value in the output buffer */
 
-int caml_extern_allow_out_of_heap = 0;
+int caml_extern_allow_out_of_heap = 1;
 
 static void extern_rec(value v)
 {

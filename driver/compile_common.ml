@@ -92,10 +92,17 @@ let interface ~tool_name ~frontend ~typing ~sourcefile ~outputprefix =
 
 (** Frontend for a .ml file *)
 
+type type_impl =
+  { structure: Typedtree.structure
+  ; coercion: Typedtree.module_coercion
+  ; signature: Types.signature
+  ; imports: Env.import_list
+  }
+
 type typecheck_impl_fun
   =  info
   -> Parsetree.structure
-  -> Typedtree.structure * Typedtree.module_coercion * Types.signature * Env.import_list
+  -> type_impl
 
 let typecheck_impl type_impl i ast =
   let { sourcefile; outputprefix; modulename; env } = i in
@@ -103,7 +110,7 @@ let typecheck_impl type_impl i ast =
     Filename.remove_extension sourcefile ^ !Config.interface_suffix
   in
   let tst = Misc.try_finally (fun () ->
-    let str, coercion, simple_sg, imports = type_impl i ast in
+    let { structure; coercion; signature; imports } = type_impl i ast in
     let extra_import =
       if not !Clflags.print_types then begin
         let intf_exists = Sys.file_exists sourceintf in
@@ -114,7 +121,7 @@ let typecheck_impl type_impl i ast =
             let cmi, import =
               Env.save_signature
                 ~deprecated
-                simple_sg
+                signature
                 modulename
                 (outputprefix ^ ".cmi")
             in
@@ -143,7 +150,7 @@ let typecheck_impl type_impl i ast =
         Cmt_format.save_cmt
           (outputprefix ^ ".cmt")
           modulename
-          (Cmt_format.Implementation str)
+          (Cmt_format.Implementation structure)
           (Some sourcefile)
           env
           cmi;
@@ -151,7 +158,7 @@ let typecheck_impl type_impl i ast =
       end else
         imports
     in
-    (str, coercion, extra_import)
+    (structure, coercion, extra_import)
   )
   ~always:(fun () -> Stypes.dump (Some (annot i)))
   ~exceptionally:(fun () ->
@@ -183,20 +190,21 @@ let implementation ~tool_name ~native ~frontend ~typing ~backend ~sourcefile ~ou
     |> print_if info.ppf_dump Clflags.dump_source Pprintast.structure
   in
   let typing = Option.value typing ~default:(fun info ast ->
-    let st, coer, sg =
+    let structure, coercion, signature =
       Typemod.type_implementation info.sourcefile info.modulename info.env ast
     in
-    (st, coer, sg, Env.imports ())
+    { structure; coercion; signature; imports = Env.imports () }
   ) in
-  let ts, coer, imports =
+  let ts, coercion, imports =
     (Profile.(record typing) (typecheck_impl typing)) info parsed
     |> print_if info.ppf_dump Clflags.dump_typedtree
-        (fun ppf (ts, coer, _) -> Printtyped.implementation_with_coercion ppf (ts, coer))
+        (fun ppf (ts, coercion, _) ->
+          Printtyped.implementation_with_coercion ppf (ts, coercion))
   in
   if not !Clflags.print_types then begin
     let exceptionally () =
       List.iter (fun suf -> remove_file (suf info)) sufs;
     in
-    Misc.try_finally ~exceptionally (fun () -> backend info (ts, coer) imports)
+    Misc.try_finally ~exceptionally (fun () -> backend info (ts, coercion) imports)
   end
 

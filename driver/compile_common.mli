@@ -58,10 +58,17 @@ val interface :
 
 (** {2 Implementations} *)
 
+type type_impl =
+  { structure: Typedtree.structure
+  ; coercion: Typedtree.module_coercion
+  ; signature: Types.signature
+  ; imports: Env.import_list
+  }
+
 type typecheck_impl_fun
   =  info
   -> Parsetree.structure
-  -> Typedtree.structure * Typedtree.module_coercion * Types.signature * Env.import_list
+  -> type_impl
 
 (** [typecheck_impl info parsetree] typechecks an implementation and returns
     the typedtree of the associated module, along with a coercion against
